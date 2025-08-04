@@ -1,0 +1,11 @@
+EsFestivo = 
+IF(
+  COUNTROWS(
+    FILTER(
+      FestivosCol,
+      DATEVALUE( FestivosCol[Date] ) = Calendario[Date]
+    )
+  ) > 0,
+  TRUE(),
+  FALSE()
+)

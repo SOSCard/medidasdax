@@ -1,0 +1,14 @@
+Calendario = 
+ADDCOLUMNS(
+    CALENDAR(DATE(2010,1,1), DATE(2030,12,31)),
+    "Año", YEAR([Date]),
+    "Mes Número", MONTH([Date]),
+    "Mes Nombre", FORMAT([Date], "mmmm"),
+    "Trimestre", "T" & FORMAT([Date], "Q"),
+    "Día", DAY([Date]),
+    "Día Semana Nº", WEEKDAY([Date], 2),   // 1 = lunes … 7 = domingo
+    "Día Semana Nombre", FORMAT([Date], "dddd"),
+    "Semana Año", WEEKNUM([Date], 2),
+    "Año-Mes", FORMAT([Date], "YYYY-MM"),
+    "Es Fin de Semana", IF(WEEKDAY([Date],2) >= 6, TRUE(), FALSE())
+)
