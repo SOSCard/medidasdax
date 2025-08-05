@@ -1,0 +1,114 @@
+-- 1. Ventas Totales (La base de todo)
+Total Ventas = SUM(Ventas[Venta_Total])
+
+-- 2. Unidades Totales Vendidas
+Total Unidades = SUM(Ventas[Unidades_Vendidas])
+
+-- 3. Conteo de Transacciones (Tickets de venta)
+Num Transacciones = COUNTROWS(Ventas)
+
+-- 4. Precio Promedio por Unidad
+Precio Promedio = DIVIDE([Total Ventas], [Total Unidades], 0)
+-- El 0 al final maneja el error de división por cero, devolviendo 0 en lugar de un error.
+
+-- 5. Venta Promedio por Transacción (Ticket Promedio)
+Ticket Promedio = DIVIDE([Total Ventas], [Num Transacciones], 0)
+
+-- 6. Conteo de Productos/Clientes Distintos (Para entender la amplitud del surtido o la base de clientes)
+Num Productos Unicos = DISTINCTCOUNT(Ventas[SKU])
+Num Clientes Unicos = DISTINCTCOUNT(Ventas[ID_Cliente])
+-- --- COMPARATIVAS DIRECTAS ---
+
+-- 7. Ventas del Año Anterior (Year-over-Year, YoY)
+Ventas PY = CALCULATE([Total Ventas], SAMEPERIODLASTYEAR('Calendario'[Date]))
+-- PY = Previous Year
+
+-- 8. Crecimiento de Ventas YoY (Absoluto)
+Crecimiento Ventas YoY ($) = [Total Ventas] - [Ventas PY]
+
+-- 9. Crecimiento de Ventas YoY (Porcentual)
+Crecimiento Ventas YoY (%) = DIVIDE([Crecimiento Ventas YoY ($)], [Ventas PY])
+-- Nota: Es crucial usar la medida [Ventas PY] en el denominador.
+
+-- 10. Ventas del Mes Anterior (Month-over-Month, MoM)
+Ventas PM = CALCULATE([Total Ventas], PREVIOUSMONTH('Calendario'[Date]))
+-- PM = Previous Month
+
+-- 11. Crecimiento de Ventas MoM (%)
+Crecimiento Ventas MoM (%) = DIVIDE([Total Ventas] - [Ventas PM], [Ventas PM])
+
+
+-- --- ACUMULADOS (Muy usados en reportes financieros y de ventas) ---
+
+-- 12. Ventas Acumuladas en el Año (Year-to-Date, YTD)
+Ventas YTD = TOTALYTD([Total Ventas], 'Calendario'[Date])
+
+-- 13. Ventas Acumuladas en el Año Anterior (para comparar YTDs)
+Ventas YTD PY = CALCULATE([Ventas YTD], SAMEPERIODLASTYEAR('Calendario'[Date]))
+-- Alternativa: TOTALYTD([Ventas PY], 'Calendario'[Date])
+
+-- 14. Ventas Acumuladas en el Trimestre (Quarter-to-Date, QTD)
+Ventas QTD = TOTALQTD([Total Ventas], 'Calendario'[Date])
+-- 15. Ranking de Productos (o Clientes, Países, etc.)
+-- Se usa mejor en una tabla o matriz, junto a la dimensión que quieres rankear (ej. Producto).
+Ranking de Productos = 
+    IF(
+        HASONEVALUE(Productos[Producto]), -- Evita que se calcule en el total
+        RANKX(
+            ALLSELECTED(Productos[Producto]), -- Rankea sobre todos los productos visibles
+            [Total Ventas],
+            ,
+            DESC, -- DESC para que el de mayor venta sea el #1
+            Dense
+        )
+    )
+
+-- 16. Ventas del Top 3 Productos (Para comparar el core vs. el resto)
+-- Esta es más avanzada y demuestra dominio de variables y funciones de tabla.
+Ventas Top 3 Productos = 
+    VAR Top3Productos = 
+        TOPN(
+            3, 
+            VALUES(Productos[Producto]),
+            [Total Ventas],
+            DESC
+        )
+    RETURN
+        CALCULATE(
+            [Total Ventas],
+            KEEPFILTERS(Top3Productos) -- KEEPFILTERS es clave para que funcione bien con otros filtros.
+        )
+
+-- 17. Porcentaje sobre el Total (Participación de Mercado o "Share of...")
+-- Ejemplo: ¿Qué % de las ventas totales representa cada marca?
+% Ventas sobre Total Marca = 
+    DIVIDE(
+        [Total Ventas],
+        CALCULATE([Total Ventas], ALLSELECTED(Productos[Marca])) -- Calcula el total de todas las marcas visibles
+    )
+-- 18. Ventas del Año Móvil (Rolling 12 Months - TTM: Trailing Twelve Months)
+-- Muy útil para suavizar tendencias estacionales y ver la salud del negocio a largo plazo.
+Ventas TTM = 
+    CALCULATE(
+        [Total Ventas],
+        DATESINPERIOD(
+            'Calendario'[Date],
+            MAX('Calendario'[Date]),
+            -12,
+            MONTH
+        )
+    )
+
+-- 19. Conteo de Clientes Nuevos
+-- Requiere un poco más de lógica. ¿Cómo definimos un "cliente nuevo"?
+-- Cliente que compró en el período actual pero NO en el período anterior.
+Clientes Nuevos = 
+    VAR ClientesPeriodoActual = VALUES(Ventas[ID_Cliente])
+    VAR ClientesPeriodoAnterior = 
+        CALCULATETABLE(
+            VALUES(Ventas[ID_Cliente]),
+            DATEADD('Calendario'[Date], -1, YEAR) -- Ajustar el período según la definición
+        )
+    VAR ClientesNuevos = EXCEPT(ClientesPeriodoActual, ClientesPeriodoAnterior)
+    RETURN
+        COUNTROWS(ClientesNuevos)
